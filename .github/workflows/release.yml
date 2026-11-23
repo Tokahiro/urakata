@@ -3,8 +3,14 @@ name: Release
 # Builds the installer. On a tag v<version> it creates a draft GitHub
 # release with the installer, its SHA-256 and the notes of that version
 # from CHANGELOG.md; a maintainer checks and publishes it.
+#
+# A push to main of Tokahiro/urakata whose Cargo.toml version has no tag
+# yet builds the same draft release and creates the tag v<version> on that
+# commit. A tag made with the workflow token starts no other workflow run,
+# so this run does the build itself.
 on:
   push:
+    branches: [main]
     tags: ['v*']
   pull_request:
     paths:
@@ -21,7 +27,44 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Works out the tag for a push to main of the public repository: the
+  # Cargo.toml version, unless that tag exists already. The release job
+  # creates the tag only after the build has passed.
+  tag:
+    if: >-
+      github.repository == 'Tokahiro/urakata' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: Cargo.toml
+          sparse-checkout-cone-mode: false
+      - name: New version
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$v" ]; then echo "no workspace version in Cargo.toml" >&2; exit 1; fi
+          tag="v$v"
+          found=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" \
+            --jq ".[] | select(.ref == \"refs/tags/$tag\") | .ref")
+          if [ -n "$found" ]; then
+            echo "$tag exists already, nothing to release"
+          else
+            echo "$tag is new"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
   installer:
+    needs: tag
+    if: >-
+      !cancelled() &&
+      (github.ref_type == 'tag' || github.event_name != 'push' || needs.tag.outputs.tag != '')
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -35,12 +78,14 @@ jobs:
       - name: Version
         id: version
         shell: pwsh
+        env:
+          TAG: ${{ needs.tag.outputs.tag || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
           $toml = Get-Content Cargo.toml -Raw
           if ($toml -notmatch '(?m)^version = "([^"]+)"') { throw 'no workspace version in Cargo.toml' }
           $v = $Matches[1]
-          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$v") {
-            throw "tag $env:GITHUB_REF_NAME does not match the Cargo version $v"
+          if ($env:TAG -and $env:TAG -ne "v$v") {
+            throw "tag $env:TAG does not match the Cargo version $v"
           }
           "version=$v" >> $env:GITHUB_OUTPUT
       - name: Release notes
@@ -76,11 +121,24 @@ jobs:
       - name: Driver package
         shell: pwsh
         run: ./installer/fetch-driver.ps1 -OutDir "$env:RUNNER_TEMP\sudovda"
+      # A pinned Inno Setup, not the one on the runner image or from
+      # Chocolatey, so an image update cannot change the compiler. Hash from
+      # the .issig file on files.jrsoftware.org.
       - name: Inno Setup
         shell: pwsh
+        env:
+          INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe
+          INNO_SHA256: A549929319F9120716677C685535CA4671E4B937B5FDC87E2585F32D8EB30E8C
         run: |
-          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          $setup = "$env:RUNNER_TEMP\innosetup-setup.exe"
+          $dir = "$env:RUNNER_TEMP\innosetup"
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $setup -UseBasicParsing
+          $got = (Get-FileHash $setup -Algorithm SHA256).Hash
+          if ($got -ne $env:INNO_SHA256) { throw "Inno Setup download has SHA-256 $got, expected $env:INNO_SHA256" }
+          $p = Start-Process $setup -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/PORTABLE=1', "/DIR=`"$dir`""
+          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed with exit code $($p.ExitCode)" }
+          $iscc = "$dir\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe is missing in $dir" }
           & $iscc /Q "/DAppVersion=${{ steps.version.outputs.version }}" `
             "/DBinDir=$env:GITHUB_WORKSPACE\target\release" `
             "/DDriverDir=$env:RUNNER_TEMP\sudovda" installer\urakata.iss
@@ -99,8 +157,10 @@ jobs:
 
   # Only this job can write, and it runs no code from the repository.
   release:
-    if: github.ref_type == 'tag'
-    needs: installer
+    needs: [tag, installer]
+    if: >-
+      !cancelled() && needs.installer.result == 'success' &&
+      (github.ref_type == 'tag' || needs.tag.outputs.tag != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,12 +173,22 @@ jobs:
         with:
           name: release-notes
           path: notes
+      - name: Tag
+        if: needs.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          # A rerun finds the tag from the first attempt on this commit.
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" > /dev/null ||
+            [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)" = "$GITHUB_SHA" ]
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.installer.outputs.version }}
+          TAG: ${{ needs.tag.outputs.tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
             --title "urakata $VERSION" \
             --notes-file notes/release-notes.md \
             dist/*

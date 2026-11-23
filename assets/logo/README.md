@@ -23,8 +23,9 @@ engine (small SVG for 16 to 32 px, large SVG above), then
 Where the icons are used:
 
 - `icons.rc` puts both `.ico` files into `urakata.exe`,
-  `urakata-watch.exe` and `urakata-app.exe` (the build scripts of the two
-  crates compile it). Number 1 is the open curtain, which Explorer shows;
+  `urakata-watch.exe` and `urakata-app.exe` (`crates/urakata/winres.rs`,
+  used by the build scripts of the two crates, includes it together with
+  the version resource). Number 1 is the open curtain, which Explorer shows;
   number 2 is the closed curtain.
 - The tray icon of the watcher loads them by these numbers: closed curtain
   while no stream runs, open curtain while one runs.

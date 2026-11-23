@@ -3,6 +3,12 @@
 The release workflow takes the notes of a release from the section with
 its version. The heading line of each section is exactly `## <version>`.
 
+## 0.1.2
+
+- New option `urakata --version` (short `-V`) prints the version.
+- `urakata.exe`, `urakata-watch.exe` and `urakata-app.exe` now carry
+  version information, shown in their file properties in Windows.
+
 ## 0.1.1
 
 - Maintenance release with no change to the programs. It checks that

@@ -30,6 +30,7 @@ Usage: urakata status [--json]
        urakata driver uninstall [--keep-certificate] [--log <file>]
        urakata update [--check]
        urakata steam-entry [--add | --remove]
+       urakata --version
 
 Commands:
   status      Show the SudoVDA driver state, the active displays and setup
@@ -72,6 +73,8 @@ Options:
               shortcuts.vdf.urakata-backup.
   --remove    Remove the entry.
   -h, --help  Show this help.
+  -V, --version
+              Show the version of urakata.
 
 Exit codes:
   0  Success.
@@ -89,6 +92,7 @@ const EXIT_PARTIAL: u8 = 3;
 #[derive(Debug, PartialEq, Eq)]
 enum Command {
     Help,
+    Version,
     Status { json: bool },
     Exclusive { dry_run: bool },
     Restore { dry_run: bool },
@@ -174,6 +178,12 @@ fn parse(args: &[String]) -> Result<Command, String> {
     let command = match args.next() {
         None => return Err("missing command".into()),
         Some("-h" | "--help" | "help") => return Ok(Command::Help),
+        Some("-V" | "--version") => {
+            return match args.next() {
+                None => Ok(Command::Version),
+                Some(other) => Err(format!("unknown option '{other}'")),
+            };
+        }
         Some("driver") => return parse_driver(args),
         Some("update") => {
             let rest: Vec<&str> = args.collect();
@@ -234,6 +244,7 @@ fn main() -> ExitCode {
         Command::Driver(_) => unreachable!("handled above"),
         Command::Update { check_only } => update(check_only).map(|t| (t, false)),
         Command::Help => Ok((USAGE.to_string(), false)),
+        Command::Version => Ok((format!("urakata {}", urakata::update::CURRENT), false)),
         Command::Status { json } => status_text(json),
         Command::Exclusive { dry_run } => change(dry_run, Change::Exclusive),
         Command::Restore { dry_run } => change(dry_run, Change::Restore),
@@ -519,6 +530,13 @@ mod tests {
         );
         assert_eq!(parse(&args(&["status", "-h"])), Ok(Command::Help));
         assert_eq!(parse(&args(&["--help"])), Ok(Command::Help));
+    }
+
+    #[test]
+    fn parse_version() {
+        assert_eq!(parse(&args(&["--version"])), Ok(Command::Version));
+        assert_eq!(parse(&args(&["-V"])), Ok(Command::Version));
+        assert!(parse(&args(&["--version", "--json"])).is_err());
     }
 
     #[test]

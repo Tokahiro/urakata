@@ -39,7 +39,7 @@ the pull request what you tested.
 
 ## Installer and releases
 
-The installer is built with Inno Setup 6.3 or newer from
+The installer is built with Inno Setup 6.3 or newer (CI pins 6.7.4) from
 `installer/urakata.iss`. `installer/fetch-driver.ps1` downloads Apollo
 0.4.6, takes the SudoVDA driver files from it and checks their hashes.
 The repository holds no driver binary.
@@ -52,11 +52,15 @@ and the installer:
 - on a tag `v<version>`, as a draft GitHub release with
   `urakata-setup-<version>.exe` and its `.sha256` file. The tag must match
   the version in `Cargo.toml`. The release notes are the `## <version>`
-  section of `CHANGELOG.md`; the build fails without it.
+  section of `CHANGELOG.md`; the build fails without it;
+- on a push to `main` of this repository whose `Cargo.toml` version has
+  no tag yet: it builds the same draft release and, once the build has
+  passed, tags that commit `v<version>`. A version that already has a tag
+  is skipped.
 
 To release: raise `version` in `Cargo.toml`, add its section to
-`CHANGELOG.md`, merge, tag `v<version>` on `main`, push the tag, check
-the draft release and publish it.
+`CHANGELOG.md` and merge to `main`. Then check the draft release and
+publish it.
 
 ## License
 

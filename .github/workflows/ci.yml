@@ -25,3 +25,20 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --locked
+      - name: Version resources
+        shell: pwsh
+        run: |
+          cargo build --workspace --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $toml = Get-Content Cargo.toml -Raw
+          if ($toml -notmatch '(?m)^version = "([^"]+)"') { throw 'no workspace version in Cargo.toml' }
+          $v = $Matches[1]
+          foreach ($exe in 'urakata', 'urakata-watch', 'urakata-app') {
+            $info = (Get-Item "target\debug\$exe.exe").VersionInfo
+            "$exe.exe: $($info.FileDescription), file $($info.FileVersion), product $($info.ProductVersion)"
+            if ($info.ProductVersion -ne $v -or $info.FileVersion -ne $v -or -not $info.FileDescription) {
+              throw "$exe.exe has no version resource for $v"
+            }
+          }
+          $out = & target\debug\urakata.exe --version
+          if ($out -ne "urakata $v") { throw "urakata --version printed '$out'" }

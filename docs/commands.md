@@ -9,6 +9,8 @@ with its full path, for example in PowerShell:
 ```
 
 `urakata --help` lists all commands and options.
+`urakata --version` shows the installed version. The programs also carry
+it in their file properties (Properties > Details in Explorer).
 
 ## status
 
