@@ -1,0 +1,33 @@
+name: Weekly
+
+# Builds main with the newest stable Rust and the newest compatible crates,
+# so upstream breakage shows up before the next release.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  latest:
+    if: github.repository == 'Tokahiro/urakata-dev'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy
+      - name: Update crates
+        run: cargo update --verbose
+        env:
+          # Also take crates that need a newer Rust than rust-version.
+          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: allow
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace

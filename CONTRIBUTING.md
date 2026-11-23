@@ -51,10 +51,12 @@ and the installer:
   workflow artifact;
 - on a tag `v<version>`, as a draft GitHub release with
   `urakata-setup-<version>.exe` and its `.sha256` file. The tag must match
-  the version in `Cargo.toml`.
+  the version in `Cargo.toml`. The release notes are the `## <version>`
+  section of `CHANGELOG.md`; the build fails without it.
 
-To release: raise `version` in `Cargo.toml`, merge, tag `v<version>` on
-`main`, push the tag, check the draft release and publish it.
+To release: raise `version` in `Cargo.toml`, add its section to
+`CHANGELOG.md`, merge, tag `v<version>` on `main`, push the tag, check
+the draft release and publish it.
 
 ## License
 

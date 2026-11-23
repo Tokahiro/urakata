@@ -1,7 +1,8 @@
 name: Release
 
 # Builds the installer. On a tag v<version> it creates a draft GitHub
-# release with the installer and its SHA-256; a maintainer checks and publishes it.
+# release with the installer, its SHA-256 and the notes of that version
+# from CHANGELOG.md; a maintainer checks and publishes it.
 on:
   push:
     tags: ['v*']
@@ -9,6 +10,8 @@ on:
     paths:
       - 'installer/**'
       - '.github/workflows/release.yml'
+      - 'Cargo.toml'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +43,30 @@ jobs:
             throw "tag $env:GITHUB_REF_NAME does not match the Cargo version $v"
           }
           "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Release notes
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          $lines = Get-Content CHANGELOG.md
+          $start = [array]::IndexOf($lines, "## $env:VERSION")
+          if ($start -lt 0) { throw "CHANGELOG.md has no section '## $env:VERSION'" }
+          $body = @()
+          foreach ($line in $lines[($start + 1)..($lines.Count - 1)]) {
+            if ($line -match '^## ') { break }
+            $body += $line
+          }
+          $text = ($body -join "`n").Trim()
+          if (-not $text) { throw "the CHANGELOG.md section for $env:VERSION is empty" }
+          $text += "`n`n### Install`n`nDownload ``urakata-setup-$env:VERSION.exe`` below, run it and install the bundled SudoVDA driver when asked. Then set Steam up as shown in [Setup](https://github.com/$env:REPO/blob/main/docs/setup.md). Check the download against the ``.sha256`` file. The setup is not signed yet, so Windows SmartScreen can warn on the first start.`n"
+          New-Item -ItemType Directory -Force notes | Out-Null
+          Set-Content -Encoding utf8NoBOM notes/release-notes.md $text
+          Get-Content notes/release-notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes/release-notes.md
       - name: Build
         run: cargo build --release --locked --workspace
       - uses: actions/cache@v4
@@ -82,6 +109,10 @@ jobs:
         with:
           name: urakata-setup
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,5 +120,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
             --title "urakata $VERSION" \
-            --notes "Installer for Windows 10 and 11 (x64). Check the download against the .sha256 file." \
+            --notes-file notes/release-notes.md \
             dist/*
