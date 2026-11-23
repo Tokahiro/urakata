@@ -1,0 +1,656 @@
+// Settings window of urakata. The Rust side (src/window.rs) fills the
+// properties and runs the callbacks; this file holds no logic.
+// The look is Kidō's (ui/kido.slint).
+
+import { ScrollView, Palette } from "std-widgets.slint";
+import { Kido, Icons, Icon, Card, Glass, KButton, KSwitch, Stepper, Kicker, RailItem, NoticeLine } from "kido.slint";
+
+// Rust sets Kido.big-picture.
+export { Kido }
+
+// One status line. `level` is "ok", "warn" or "unknown".
+export struct CheckRow {
+    title: string,
+    level: string,
+    message: string,
+}
+
+// Text under a section, beside its buttons.
+component Note inherits Text {
+    wrap: word-wrap;
+    vertical-alignment: center;
+    horizontal-stretch: 1;
+    color: Kido.text-muted;
+    font-size: Kido.label-size;
+}
+
+export component AppWindow inherits Window {
+    title: "urakata";
+    icon: @image-url("icon.png");
+    preferred-width: 900px;
+    preferred-height: 600px;
+    // The sidebar plus the About card's two buttons and its words.
+    min-width: 760px;
+    min-height: 440px;
+    background: Kido.ground;
+    default-font-family: "Inter";
+    default-font-size: Kido.label-size;
+
+    // Status
+    in property <[CheckRow]> checks;
+    in property <[string]> errors;
+    in property <string> stream-text;
+    in property <string> read-at;
+    in property <bool> reading;
+
+    // Watcher
+    in property <bool> watcher-running;
+    in property <bool> watcher-known;
+    in-out property <bool> autostart;
+    in property <bool> autostart-known;
+
+    // Settings the watcher reads
+    in-out property <bool> exclusive;
+    in-out property <int> start-delay;
+    in-out property <int> guard-time;
+    in-out property <int> guard-reapply;
+    in property <int> max-start-delay;
+    in property <int> max-guard-time;
+    in property <int> max-guard-reapply;
+    in-out property <bool> tray-icon;
+    in property <bool> settings-dirty;
+    in property <string> settings-path;
+
+    // Driver
+    in property <string> driver-line;
+    in property <string> driver-details;
+    in property <string> driver-button;
+    in property <bool> driver-can-repair;
+
+    // About
+    in property <string> version;
+
+    // The page shown: an index into page-names. The sidebar items (t0..t4)
+    // and the `if root.page == n` blocks below follow this order.
+    in-out property <int> page;
+    private property <[string]> page-names: ["Status", "Watcher", "Settings", "Displays", "About"];
+
+    // Last action result
+    // Rust sets it; a click on a control clears it.
+    in-out property <string> notice;
+    // Where the notice shows: the control that was used last sets it, so
+    // the result appears next to it (an action's result keeps the place of
+    // the control that started it).
+    in-out property <string> notice-at;
+    in property <bool> notice-error;
+    in property <bool> busy;
+
+    callback refresh();
+    callback start-watcher();
+    callback stop-watcher();
+    callback autostart-toggled(bool);
+    callback settings-edited();
+    callback save-settings();
+    callback default-settings();
+    callback restore-displays();
+    callback open-folder();
+    callback repair-driver();
+    callback check-update();
+    callback open-release-page();
+    // Move the keyboard focus to the next (1) or previous (-1) control, as
+    // Tab and Shift+Tab do. Rust sends the key; Slint has no call for it.
+    callback move-focus(int);
+    callback close-window();
+
+    // Back was pressed with unsaved settings: the next Back closes anyway.
+    private property <bool> close-armed;
+
+    changed settings-dirty => {
+        root.close-armed = false;
+    }
+
+    public function rail-focused() -> bool {
+        return t0.has-focus || t1.has-focus || t2.has-focus || t3.has-focus || t4.has-focus;
+    }
+
+    // Back (Esc, or B on a controller): from a page to its sidebar item;
+    // from the sidebar, close the window. Unsaved settings ask for a
+    // second Back first.
+    public function back() {
+        if !root.rail-focused() {
+            root.go(root.page, true);
+        } else if root.settings-dirty && !root.close-armed {
+            root.go(2, true);
+            root.notice-at = "settings";
+            root.notice = "The settings are not saved. Press Back again to close without saving.";
+            root.close-armed = true;
+        } else {
+            root.close-window();
+        }
+    }
+
+    // Show page `n` (wrapping). With `to-item`, the keyboard focus goes to
+    // its sidebar item; otherwise to the window's key scope. Either way the
+    // focus never stays on a control of the page that goes away, or the
+    // window would stop taking keys. A notice stays with its control, so it
+    // shows again when its page comes back.
+    public function go(n: int, to-item: bool) {
+        let next = Math.mod(n, root.page-names.length);
+        // A warning about unsaved settings holds for the next Back only.
+        root.close-armed = false;
+        root.page = next;
+        if !to-item {
+            keys.focus();
+        } else if next == 0 {
+            t0.focus();
+        } else if next == 1 {
+            t1.focus();
+        } else if next == 2 {
+            t2.focus();
+        } else if next == 3 {
+            t3.focus();
+        } else {
+            t4.focus();
+        }
+    }
+
+    // A new page starts at its top.
+    changed page => {
+        list.content-y = 0;
+    }
+
+    // Kidō is dark only: keep the scroll bar dark too.
+    // The key scope takes the focus at start, so the page keys work
+    // before anything was clicked or tabbed to.
+    init => {
+        Palette.color-scheme = ColorScheme.dark;
+        Kido.window-width = self.width;
+        Kido.window-height = self.height;
+        keys.focus();
+    }
+    changed width => {
+        Kido.window-width = self.width;
+    }
+    changed height => {
+        Kido.window-height = self.height;
+    }
+
+    // The backdrop behind the glass, as Kidō lays a page without art on the
+    // last game's art, blurred and dimmed. assets/backdrop/gen.py bakes
+    // both; Big Picture's is sharper (the glass holds the blurred frost)
+    // and lifted for the stream.
+    Image {
+        width: root.width;
+        height: root.height;
+        source: Kido.big-picture ? @image-url("backdrop-bp.png") : @image-url("backdrop-desktop.png");
+        image-fit: cover;
+        accessible-role: none;
+    }
+
+    // Ctrl+Tab and Ctrl+Page Down show the next page, Ctrl+Shift+Tab and
+    // Ctrl+Page Up the one before, from anywhere in the window.
+    keys := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        capture-key-pressed(event) => {
+            if event.modifiers.control {
+                if (event.text == Key.Tab && !event.modifiers.shift) || event.text == Key.PageDown {
+                    root.go(root.page + 1, true);
+                    return accept;
+                }
+                if event.text == Key.Backtab || (event.text == Key.Tab && event.modifiers.shift) || event.text == Key.PageUp {
+                    root.go(root.page - 1, true);
+                    return accept;
+                }
+            }
+            reject
+        }
+
+        // Keys that no control took. Up, Down, Left and Right move the focus
+        // through the page, so that a controller's D-pad (sent as arrow keys)
+        // reaches every control; on the sidebar, Right goes into the page.
+        key-pressed(event) => {
+            // With Ctrl or Shift held, the Tab sent for an arrow would
+            // change the page or go the other way.
+            if event.modifiers.control || event.modifiers.shift || event.modifiers.alt {
+                return reject;
+            }
+            if event.text == Key.Escape {
+                root.back();
+                return accept;
+            }
+            if root.rail-focused() {
+                if event.text == Key.RightArrow {
+                    root.move-focus(1);
+                }
+                return event.text == Key.LeftArrow || event.text == Key.RightArrow ? accept : reject;
+            }
+            if event.text == Key.DownArrow || event.text == Key.RightArrow {
+                root.move-focus(1);
+                return accept;
+            }
+            if event.text == Key.UpArrow || event.text == Key.LeftArrow {
+                root.move-focus(-1);
+                return accept;
+            }
+            reject
+        }
+
+        HorizontalLayout {
+            // The sidebar: one item per page. The window is wider than high,
+            // so the pages go to the side and the list keeps its height.
+            // It lies on Kidō's lens glass, as Kidō's PageSwitcher does.
+            VerticalLayout {
+                width: 190px;
+                padding-left: 10px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                Glass {
+                    border-radius: Kido.radius-card;
+                    VerticalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        padding-top: 14px;
+                        padding-bottom: 10px;
+                        spacing: 4px;
+                        accessible-role: tab-list;
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-bottom: 14px;
+                            Text {
+                                text: "urakata";
+                                color: Kido.text;
+                                font-size: Kido.page-title-size;
+                                font-weight: 600;
+                                letter-spacing: -0.6px;
+                                accessible-role: text;
+                            }
+                        }
+
+                        t0 := RailItem {
+                            text: root.page-names[0];
+                            current: root.page == 0;
+                            picked => {
+                                // Enter on a focused item keeps the focus in the sidebar.
+                                root.go(0, self.has-focus);
+                            }
+                            step(d) => {
+                                root.go(0 + d, true);
+                            }
+                        }
+
+                        t1 := RailItem {
+                            text: root.page-names[1];
+                            current: root.page == 1;
+                            picked => {
+                                // Enter on a focused item keeps the focus in the sidebar.
+                                root.go(1, self.has-focus);
+                            }
+                            step(d) => {
+                                root.go(1 + d, true);
+                            }
+                        }
+
+                        t2 := RailItem {
+                            text: root.page-names[2];
+                            current: root.page == 2;
+                            marked: root.settings-dirty;
+                            mark-label: "Not saved";
+                            picked => {
+                                // Enter on a focused item keeps the focus in the sidebar.
+                                root.go(2, self.has-focus);
+                            }
+                            step(d) => {
+                                root.go(2 + d, true);
+                            }
+                        }
+
+                        t3 := RailItem {
+                            text: root.page-names[3];
+                            current: root.page == 3;
+                            picked => {
+                                // Enter on a focused item keeps the focus in the sidebar.
+                                root.go(3, self.has-focus);
+                            }
+                            step(d) => {
+                                root.go(3 + d, true);
+                            }
+                        }
+
+                        t4 := RailItem {
+                            text: root.page-names[4];
+                            current: root.page == 4;
+                            picked => {
+                                // Enter on a focused item keeps the focus in the sidebar.
+                                root.go(4, self.has-focus);
+                            }
+                            step(d) => {
+                                root.go(4 + d, true);
+                            }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                        }
+
+                        // Big Picture: the controller buttons.
+                        // In line with the item labels (RailItem's padding).
+                        if Kido.big-picture: HorizontalLayout {
+                            padding-left: 16px;
+                            Text {
+                                text: "A  select\nB  back\nLB RB  page";
+                                color: Kido.text-hint;
+                                font-size: Kido.label-size;
+                            }
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                padding-top: 20px;
+
+                // The page's name, Kidō's sheet-title (32/600).
+                HorizontalLayout {
+                    padding-left: Kido.page-margin;
+                    padding-top: 8px;
+                    padding-bottom: 14px;
+                    Text {
+                        text: root.page-names[root.page];
+                        color: Kido.text;
+                        font-size: 22.4px;
+                        font-weight: 600;
+                        accessible-role: text;
+                    }
+                }
+
+                list := ScrollView {
+                    VerticalLayout {
+                        padding-left: Kido.page-margin;
+                        // Room for the scroll bar.
+                        padding-right: Kido.page-margin + 8px;
+                        padding-top: 8px;
+                        padding-bottom: Kido.page-margin;
+                        spacing: Kido.settings-gap;
+                        alignment: start;
+
+                        if root.page == 0: VerticalLayout {
+                            spacing: Kido.settings-gap;
+
+                            Card {
+                                title: stream-text;
+                            }
+
+                            for c in checks: Card {
+                                level: c.level;
+                                title: c.title;
+                                value: c.message;
+                            }
+
+                            for e in errors: Card {
+                                level: "warn";
+                                title: "Not read";
+                                value: e;
+                                value-color: Kido.warning;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Note {
+                                    text: reading ? "Reading…" : "Read at " + read-at;
+                                }
+
+                                KButton {
+                                    text: "Read again";
+                                    enabled: !reading;
+                                    clicked => {
+                                        root.refresh();
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.page == 1: VerticalLayout {
+                            spacing: Kido.settings-gap;
+
+                            Card {
+                                title: !watcher-known ? "State not read" : watcher-running ? "The watcher runs" : "The watcher does not run";
+                                notice: root.notice-at == "watcher" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: "It turns the other displays off when a stream starts and checks the layout after it ends.";
+                                KButton {
+                                    text: watcher-running ? "Stop" : "Start";
+                                    enabled: watcher-known && !busy;
+                                    clicked => {
+                                        if watcher-running {
+                                            root.notice = "";
+                                            root.notice-at = "watcher";
+                                            root.stop-watcher();
+                                        } else {
+                                            root.notice = "";
+                                            root.notice-at = "watcher";
+                                            root.start-watcher();
+                                        }
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Start at logon";
+                                notice: root.notice-at == "autostart" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: autostart-known ? "No admin rights needed. Settings > Apps > Startup can switch it off too." : "The logon start could not be read.";
+                                KSwitch {
+                                    label: "Start at logon";
+                                    checked <=> root.autostart;
+                                    enabled: autostart-known && !busy;
+                                    toggled => {
+                                        root.notice = "";
+                                        root.notice-at = "autostart";
+                                        root.autostart-toggled(self.checked);
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.page == 2: VerticalLayout {
+                            spacing: Kido.settings-gap;
+
+                            Card {
+                                title: "Tray icon";
+                                value: "The watcher shows an icon in the notification area, with a menu.";
+                                KSwitch {
+                                    label: "Tray icon";
+                                    checked <=> root.tray-icon;
+                                    toggled => {
+                                        root.settings-edited();
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Turn other displays off during a stream";
+                                value: "Off: the watcher only cleans up after a stream.";
+                                KSwitch {
+                                    label: "Turn other displays off during a stream";
+                                    checked <=> root.exclusive;
+                                    toggled => {
+                                        root.settings-edited();
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Start delay";
+                                value: "Wait after the stream display appears. Steam sets its own layout about 4 s after it.";
+                                Stepper {
+                                    label: "Start delay in seconds";
+                                    unit: "s";
+                                    maximum: root.max-start-delay;
+                                    enabled: root.exclusive;
+                                    value <=> root.start-delay;
+                                    edited => {
+                                        root.settings-edited();
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Guard time";
+                                value: "Turn the displays off again if another program turns them on in this time. 0 = no guard.";
+                                Stepper {
+                                    label: "Guard time in seconds";
+                                    unit: "s";
+                                    maximum: root.max-guard-time;
+                                    enabled: root.exclusive;
+                                    value <=> root.guard-time;
+                                    edited => {
+                                        root.settings-edited();
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Guard repeats";
+                                value: "How often the guard may turn the displays off again.";
+                                Stepper {
+                                    label: "Guard repeats";
+                                    maximum: root.max-guard-reapply;
+                                    enabled: root.exclusive;
+                                    value <=> root.guard-reapply;
+                                    edited => {
+                                        root.settings-edited();
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Note {
+                                    text: settings-dirty ? "Not saved. The watcher uses the saved settings from the next stream on." : "The watcher uses these settings from the next stream on.";
+                                    color: settings-dirty ? Kido.accent-label : Kido.text-muted;
+                                }
+
+                                KButton {
+                                    text: "Defaults";
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "settings";
+                                        root.default-settings();
+                                    }
+                                }
+
+                                KButton {
+                                    text: "Save";
+                                    primary: true;
+                                    enabled: settings-dirty && !busy;
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "settings";
+                                        root.save-settings();
+                                    }
+                                }
+                            }
+                            if root.notice != "" && root.notice-at == "settings": NoticeLine {
+                                text: root.notice;
+                                error: root.notice-error;
+                            }
+                        }
+
+                        if root.page == 3: VerticalLayout {
+                            spacing: Kido.settings-gap;
+
+                            Kicker {
+                                text: "DRIVER";
+                            }
+
+                            Card {
+                                title: driver-line;
+                                notice: root.notice-at == "driver" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: driver-details;
+                                KButton {
+                                    text: root.driver-button;
+                                    enabled: root.driver-can-repair && !busy;
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "driver";
+                                        root.repair-driver();
+                                    }
+                                }
+                            }
+
+
+                            Kicker {
+                                text: "DISPLAYS";
+                                // The section gap: the list's gap plus this.
+                                height: self.preferred-height + Kido.section-gap - Kido.settings-gap;
+                                vertical-alignment: bottom;
+                            }
+
+                            Card {
+                                title: "Restore displays now";
+                                notice: root.notice-at == "restore" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: "Turns the displays on again in the layout Windows stored for them. Use it if a stream left them off.";
+                                KButton {
+                                    text: "Restore";
+                                    enabled: !busy;
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "restore";
+                                        root.restore-displays();
+                                    }
+                                }
+                            }
+
+                            Card {
+                                title: "Log and settings folder";
+                                notice: root.notice-at == "folder" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: settings-path;
+                                KButton {
+                                    text: "Open";
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "folder";
+                                        root.open-folder();
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.page == 4: VerticalLayout {
+                            spacing: Kido.settings-gap;
+
+                            Card {
+                                title: "urakata " + version;
+                                notice: root.notice-at == "about" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: "Looks for a newer release on GitHub. Nothing is downloaded.";
+                                KButton {
+                                    text: "Look for updates";
+                                    enabled: !busy;
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "about";
+                                        root.check-update();
+                                    }
+                                }
+
+                                KButton {
+                                    text: "Release page";
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "about";
+                                        root.open-release-page();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,27 @@
+[package]
+name = "sudovda"
+description = "Control protocol of the SudoVDA virtual display driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+# Add and remove requests, for host tests only.
+host-test = []
+
+[[example]]
+name = "fake-display"
+required-features = ["host-test"]
+
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true
+features = [
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+]

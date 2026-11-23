@@ -1,0 +1,93 @@
+name: Release
+
+# Builds the installer. On a tag v<version> it creates a draft GitHub
+# release with the installer and its SHA-256; a maintainer checks and publishes it.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'installer/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $toml = Get-Content Cargo.toml -Raw
+          if ($toml -notmatch '(?m)^version = "([^"]+)"') { throw 'no workspace version in Cargo.toml' }
+          $v = $Matches[1]
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$v") {
+            throw "tag $env:GITHUB_REF_NAME does not match the Cargo version $v"
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Build
+        run: cargo build --release --locked --workspace
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\apollo
+          key: apollo-0.4.6
+      - name: Driver package
+        shell: pwsh
+        run: ./installer/fetch-driver.ps1 -OutDir "$env:RUNNER_TEMP\sudovda"
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc /Q "/DAppVersion=${{ steps.version.outputs.version }}" `
+            "/DBinDir=$env:GITHUB_WORKSPACE\target\release" `
+            "/DDriverDir=$env:RUNNER_TEMP\sudovda" installer\urakata.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $exe = Get-Item installer\output\urakata-setup-*.exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($exe.Name)" | Set-Content -NoNewline -Encoding ascii "$($exe.FullName).sha256"
+          Get-Content "$($exe.FullName).sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: urakata-setup
+          path: installer/output/*
+
+  # Only this job can write, and it runs no code from the repository.
+  release:
+    if: github.ref_type == 'tag'
+    needs: installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: urakata-setup
+          path: dist
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.installer.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "urakata $VERSION" \
+            --notes "Installer for Windows 10 and 11 (x64). Check the download against the .sha256 file." \
+            dist/*

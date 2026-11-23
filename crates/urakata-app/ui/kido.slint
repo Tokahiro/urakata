@@ -1,0 +1,814 @@
+// Kidō look for the settings window: the tokens of the Synthwave Stil and
+// the few parts the window uses (Card, button, switch, stepper, marks).
+//
+// Values come from Kidō's tokens.json. Kidō gives lengths in canvas px of a
+// 1920 wide canvas; this window draws them at 0.7 (Kidō's own 1280 x 800
+// window uses 0.667). The comments name the token and its canvas value.
+// Kidō has one ground for every look: true black. There is no light theme.
+
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/Inter-SemiBold.ttf";
+
+export global Kido {
+    // Started from Big Picture (`--big-picture`): the window is seen on a
+    // stream. A recording of a stream showed it darker than a local
+    // render: three sampled colours match (v - 16) x 255 / 219, the step from
+    // limited to full range. So the colours drawn only in Big Picture are
+    // lifted by v x 219 / 255 + 16, which the stream takes back. The window
+    // lies on a backdrop there too, its own.
+    in-out property <bool> big-picture;
+    // The window's size, set by AppWindow: the frost inside the glass is
+    // laid out over the whole window, as the backdrop is.
+    in-out property <length> window-width;
+    in-out property <length> window-height;
+
+    // Colours (Synthwave).
+    out property <color> ground: #000000;
+    // Big Picture: Kidō's tinted glass (PatternGlassOverArt, "Weniger
+    // Transparenz") in place of the clear lens, as the stream takes the
+    // lens' near-black middle to black: 180deg glass-top at the glass
+    // alpha A to glass-bottom at A + .06, the dark glass-edge, the glass-rim
+    // outside it, the glass-inner line inside it and the HighlightLine.
+    // Each colour lifted for the stream (above); Kidō's value in the comment.
+    // A: Kidō's Transparenz sets it between .30 and .88 (default .706);
+    // Big Picture takes .42 over the frost: clearer than the default, darker than the floor .30.
+    out property <float> glass-alpha: 0.42;
+    out property <color> glass-top-stream: #332846;          // glass-top #291c3f
+    out property <color> glass-bottom-stream: #231d2c;       // glass-bottom #160f21
+    out property <color> glass-edge-stream: #10101099;       // glass-edge #00000099
+    out property <color> glass-rim-stream: #a07aeb52;        // glass-rim #a87bff52
+    out property <color> glass-inner-stream: #ebebeb0a;      // glass-inner #ffffff0a
+    out property <color> highlight-stream: #c4e2eb;          // glass-highlight-line #d2f5ff
+    out property <color> text: #ece9f6;
+    out property <color> text-secondary: #d2c8ea;
+    // text-muted. Big Picture takes text-secondary for it: there it lies on
+    // the frosted glass, and Kidō puts only text and text-secondary on glass.
+    out property <color> text-muted-desktop: #b893ce;
+    out property <color> text-muted: big-picture ? text-secondary : text-muted-desktop;
+    // Big Picture: text-secondary, as text-muted (above).
+    out property <color> text-hint: big-picture ? text-secondary : #9399c8;
+    out property <color> accent-line: #ff00ff;
+    out property <color> accent-label: #03edf9;
+    out property <color> ok: #4ee0a1;
+    out property <color> warning: #ffb84d;
+    out property <color> problem-text: #f6a3b8;
+    out property <color> problem-12: #ff5c7a1f;
+    out property <color> problem-40: #ff5c7a66;
+    out property <color> press: #ece9f61f;
+    out property <color> accent-label-12: #03edf91f;  // accent-label wash, like ok-12
+    out property <color> segment-border: #03edf980;   // accent-label at 50 %
+    out property <color> white-05: #ffffff0d;
+    out property <color> white-08: #ffffff14;
+    out property <color> white-14: #ffffff24;
+    out property <color> white-50: #ffffff80;
+    // Still Liquid Glass, the lens every Kidō panel takes: a clear middle,
+    // the panel's own gradient (100deg, .42 to .18) and a still specular rim
+    // (135deg, brightest at the top left). Tokens lens-panel-*, lens-rim-*.
+    out property <color> lens-panel-from: #06030e6b;
+    out property <color> lens-panel-to: #06030e2e;
+    out property <color> lens-rim-start: #ffffffd9;
+    out property <color> lens-rim-mid: #ffffff2e;
+    out property <color> lens-rim-low: #ffffff0d;
+    out property <color> lens-rim-end: #ffffff38;
+    out property <color> focus-halo-soft: #03edf973;
+    // ring-soft glow: 0 0 30px 4px #ff00ff66
+    out property <color> ring-glow: #ff00ff66;
+    out property <color> tint-dialog-from: #ff00ff47;
+    out property <color> tint-dialog-to: #03edf933;
+
+    // Opacity of the chrome of a disabled control; its words stay whole.
+    out property <float> opacity-disabled: 0.45;
+
+    // Lengths (canvas px x 0.7).
+    out property <length> page-margin: 24px;         // space-32 (32): 22
+    out property <length> section-gap: 22px;         // space-32 (32)
+    out property <length> settings-gap: 8px;         // settings-gap (12)
+    out property <length> radius-card: 17px;         // radius-card (24)
+    out property <length> card-height: 70px;         // card-height (100)
+    out property <length> card-pad: 20px;            // Card padding (28)
+    out property <length> card-gap: 14px;            // Card gap (20)
+    out property <length> value-gap: 4px;            // Card value under title (6)
+    out property <length> mark-size: 21px;           // Card severity mark (30)
+    out property <length> button-height: 43px;       // dialog-button-height (62)
+    out property <length> button-pad: 21px;          // DialogButton sides (30)
+    out property <length> switch-width: 46px;        // switch-width (66)
+    out property <length> switch-height: 27px;       // switch-height (38)
+    out property <length> switch-knob: 20px;         // switch-knob (28)
+    out property <length> switch-inset: 3.5px;       // knob inset (5)
+    out property <length> caret-size: 18px;          // caret (26)
+
+    // Type (canvas px x 0.7).
+    out property <length> page-title-size: 31px;     // page-title 44/600, -0.02em
+    out property <length> card-title-size: 17.5px;   // card-title 25/500
+    out property <length> label-size: 13.5px;        // label 19/400
+    out property <length> button-size: 16px;         // button 23/500
+    out property <length> kicker-size: 12.6px;       // kicker 18/600, 0.14em
+    out property <length> segment-size: 14.7px;      // segment 21/500
+
+    // Motion.
+    out property <duration> motion-focus: 220ms;
+    out property <duration> motion-switch: 160ms;
+}
+
+// Phosphor icons (MIT, (c) Phosphor Icons), regular weight, 256 view box.
+export global Icons {
+    out property <string> check-circle: "M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z";
+    out property <string> warning: "M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z";
+    out property <string> warning-circle: "M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z";
+    out property <string> question: "M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z";
+    out property <string> caret-left: "M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z";
+    out property <string> caret-right: "M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z";
+}
+
+export component Icon inherits Path {
+    in property <string> data;
+    in property <color> color;
+    commands: data;
+    fill: color;
+    viewbox-width: 256;
+    viewbox-height: 256;
+}
+
+// RingSoft, Kidō's focus for cards, keys and dialog buttons: a 2 px
+// accent-line band, a 2 px cyan halo outside it and a soft magenta glow.
+// Put it as the first child of the element it rings.
+export component RingSoft inherits Rectangle {
+    in property <length> radius;
+    // The size of the element it rings.
+    in property <length> ringed-width;
+    in property <length> ringed-height;
+    x: -4px;
+    y: -4px;
+    width: root.ringed-width + 8px;
+    height: root.ringed-height + 8px;
+    border-radius: root.radius + 4px;
+    border-width: 2px;
+    border-color: Kido.focus-halo-soft;
+    drop-shadow-blur: 21px;
+    drop-shadow-color: Kido.ring-glow;
+    Rectangle {
+        x: 2px;
+        y: 2px;
+        width: parent.width - 4px;
+        height: parent.height - 4px;
+        border-radius: root.radius + 2px;
+        border-width: 2px;
+        border-color: Kido.accent-line;
+    }
+}
+
+// Kidō's glass (PatternGlassOverArt). On the desktop the lens: the panel
+// gradient over what lies beneath and the still rim. The software renderer
+// has no backdrop blur, so what lies beneath comes blurred: the backdrop
+// (app.slint). In Big Picture Kidō's frosted glass (see Kido): inside its
+// shape the frost, a blurred copy of the backdrop laid over the whole window
+// as the backdrop is, so the stage shows through soft, under the tint.
+export component Glass inherits Rectangle {
+    background: Kido.big-picture ? transparent : @linear-gradient(100deg, Kido.lens-panel-from 0%, Kido.lens-panel-to 100%);
+
+    if Kido.big-picture: Rectangle {
+        border-radius: root.border-radius;
+        clip: true;
+        Image {
+            x: -root.absolute-position.x;
+            y: -root.absolute-position.y;
+            width: Kido.window-width;
+            height: Kido.window-height;
+            source: @image-url("frost-bp.png");
+            image-fit: cover;
+            accessible-role: none;
+        }
+        Rectangle {
+            background: @linear-gradient(180deg, Kido.glass-top-stream.with-alpha(Kido.glass-alpha) 0%, Kido.glass-bottom-stream.with-alpha(Kido.glass-alpha + 0.06) 100%);
+        }
+    }
+
+    // Tinted glass: the dark edge, the rim 1 px outside it, the inner line
+    // 1 px inside it, and the HighlightLine on the top edge (inset 30 canvas
+    // px, strength .8). The lens rim below lies over them in both modes.
+    if Kido.big-picture: Rectangle {
+        border-radius: root.border-radius;
+        border-width: 1px;
+        border-color: Kido.glass-edge-stream;
+    }
+    if Kido.big-picture: Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: root.border-radius + 1px;
+        border-width: 1px;
+        border-color: Kido.glass-rim-stream;
+    }
+    if Kido.big-picture: Rectangle {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: root.height - 2px;
+        border-radius: max(root.border-radius - 1px, 0px);
+        border-width: 1px;
+        border-color: Kido.glass-inner-stream;
+    }
+    if Kido.big-picture: Rectangle {
+        x: 21px;
+        y: 0px;
+        width: root.width - 42px;
+        height: 1px;
+        opacity: 0.8;
+        background: @linear-gradient(90deg, Kido.highlight-stream.with-alpha(0) 0%, Kido.highlight-stream.with-alpha(0.85) 50%, Kido.highlight-stream.with-alpha(0) 100%);
+    }
+
+    // The rim is a stroked path, not the border: the software renderer
+    // draws a border in the first colour of a gradient only. 1 px
+    // (lens-rim-width 1.5 canvas px x 0.7), centred 0.5 px inside the edge.
+    // A Path fits its view box into its size less the stroke width, so the
+    // view box is one px smaller than the panel and the path runs on it.
+    property <float> w: root.width / 1px - 1;
+    property <float> h: root.height / 1px - 1;
+    property <float> r: max(min(root.border-radius / 1px - 0.5, min(self.w, self.h) / 2), 0);
+    Path {
+        viewbox-width: root.w;
+        viewbox-height: root.h;
+        stroke-width: 1px;
+        stroke: @linear-gradient(135deg, Kido.lens-rim-start 0%, Kido.lens-rim-mid 28%, Kido.lens-rim-low 60%, Kido.lens-rim-end 100%);
+        commands: "M " + root.r + " 0 L " + (root.w - root.r) + " 0"
+            + " A " + root.r + " " + root.r + " 0 0 1 " + root.w + " " + root.r
+            + " L " + root.w + " " + (root.h - root.r)
+            + " A " + root.r + " " + root.r + " 0 0 1 " + (root.w - root.r) + " " + root.h
+            + " L " + root.r + " " + root.h
+            + " A " + root.r + " " + root.r + " 0 0 1 0 " + (root.h - root.r)
+            + " L 0 " + root.r
+            + " A " + root.r + " " + root.r + " 0 0 1 " + root.r + " 0 Z";
+    }
+}
+
+// The severity mark before a finding's title: an icon in the status colour,
+// so the state never rests on colour alone.
+export component Mark inherits Icon {
+    // "ok", "warn", "problem" or "unknown"
+    in property <string> level;
+    width: Kido.mark-size;
+    height: Kido.mark-size;
+    data: level == "ok" ? Icons.check-circle : level == "warn" ? Icons.warning : level == "problem" ? Icons.warning-circle : Icons.question;
+    color: level == "ok" ? Kido.ok : level == "warn" ? Kido.warning : level == "problem" ? Kido.problem-text : Kido.text-hint;
+    accessible-role: image;
+    accessible-label: level == "ok" ? "OK" : level == "warn" ? "Warning" : level == "problem" ? "Problem" : "Unknown";
+}
+
+// The result of an action: cyan wash, line and check mark, or the problem
+// colours and mark for an error. Shown next to the control that caused it.
+export component NoticeLine inherits Rectangle {
+    in property <string> text;
+    in property <bool> error;
+    background: root.error ? Kido.problem-12 : Kido.accent-label-12;
+    border-radius: Kido.radius-card - 6px;
+    border-width: 1px;
+    border-color: root.error ? Kido.problem-40 : Kido.segment-border;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    HorizontalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                width: 18px;
+                height: 18px;
+                data: root.error ? Icons.warning-circle : Icons.check-circle;
+                color: root.error ? Kido.problem-text : Kido.accent-label;
+            }
+        }
+
+        Text {
+            text: root.text;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            color: root.error ? Kido.problem-text : Kido.text;
+        }
+    }
+}
+
+// One row of the list: title, value line under it, the control at the right.
+export component Card inherits Glass {
+    in property <string> title;
+    in property <string> value;
+    in property <color> value-color: Kido.text-secondary;
+    // Severity mark before the title; "" for none.
+    in property <string> level;
+    // The result of this card's action, shown inside the card under it.
+    in property <string> notice;
+    in property <bool> notice-error;
+    border-radius: Kido.radius-card;
+
+    VerticalLayout {
+        HorizontalLayout {
+            // The card's least height. A min-height on the row would
+            // replace the height of its wrapped words, and a list short of
+            // room would then squeeze the card to it.
+            Rectangle {
+                width: 0px;
+                min-height: Kido.card-height;
+            }
+
+            HorizontalLayout {
+                padding-left: Kido.card-pad;
+                padding-right: Kido.card-pad;
+                padding-top: 14px;
+                padding-bottom: 14px;
+                spacing: Kido.card-gap;
+
+                if root.level != "": VerticalLayout {
+                    alignment: center;
+                    Mark {
+                        level: root.level;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: Kido.value-gap;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.title;
+                        wrap: word-wrap;
+                        color: Kido.text;
+                        font-size: Kido.card-title-size;
+                        font-weight: 500;
+                    }
+
+                    if root.value != "": Text {
+                        text: root.value;
+                        wrap: word-wrap;
+                        color: root.value-color;
+                        font-size: Kido.label-size;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        @children
+                    }
+                }
+            }
+        }
+
+        if root.notice != "": HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-bottom: 8px;
+            NoticeLine {
+                text: root.notice;
+                error: root.notice-error;
+            }
+        }
+    }
+}
+
+// Kidō's DialogButton: a capsule with a faint fill and line; focus adds the
+// dialog tint and RingSoft. The accent never fills a button.
+export component KButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    // The main action of its row: the label in 600, nothing else changes.
+    in property <bool> primary;
+    callback clicked();
+    forward-focus: focus;
+
+    height: Kido.button-height;
+    min-width: label.preferred-width + 2 * Kido.button-pad;
+    preferred-width: self.min-width;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+
+    if focus.has-focus && root.enabled: RingSoft {
+        radius: root.height / 2;
+        ringed-width: root.width;
+        ringed-height: root.height;
+    }
+
+    // Disabled: no fill, a fainter line and the label in `text-hint` at
+    // `opacity-disabled`, so it reads as off at a glance. Kidō keeps the label whole; in a test
+    // a disabled button then looked enabled on a desktop.
+    Rectangle {
+        border-radius: root.height / 2;
+        background: !root.enabled ? transparent : touch.pressed ? Kido.press : touch.has-hover ? Kido.white-08 : Kido.white-05;
+        border-width: 1px;
+        border-color: root.enabled ? Kido.white-14 : Kido.white-08;
+    }
+
+    Rectangle {
+        border-radius: root.height / 2;
+        background: @linear-gradient(135deg, Kido.tint-dialog-from 0%, Kido.tint-dialog-to 100%);
+        opacity: focus.has-focus ? 1 : 0;
+        animate opacity { duration: Kido.motion-focus; }
+    }
+
+    label := Text {
+        text: root.text;
+        color: root.enabled ? Kido.text : Kido.text-hint.with-alpha(Kido.opacity-disabled);
+        font-size: Kido.button-size;
+        font-weight: root.primary ? 600 : 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        focus-on-click: false;
+        // A control reached with keys or a controller scrolls into view.
+        changed has-focus => {
+            if self.has-focus {
+                root.ensure-visible(ScrollBehavior.instant);
+            }
+        }
+        key-pressed(event) => {
+            // A FocusScope keeps the focus it has when it turns disabled.
+            if root.enabled && (event.text == " " || event.text == "\n") {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+}
+
+// Kidō's SettingSwitch: a faint edged track with a muted knob when off, the
+// accent line gradient with a light, glowing knob when on.
+export component KSwitch inherits Rectangle {
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback toggled();
+    forward-focus: focus;
+
+    width: Kido.switch-width;
+    height: Kido.switch-height;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: switch;
+    accessible-label: root.label;
+    accessible-checked: root.checked;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        root.flip();
+    }
+
+    function flip() {
+        if root.enabled {
+            root.checked = !root.checked;
+            root.toggled();
+        }
+    }
+
+    if focus.has-focus && root.enabled: RingSoft {
+        radius: root.height / 2;
+        ringed-width: root.width;
+        ringed-height: root.height;
+    }
+
+    Rectangle {
+        opacity: root.enabled ? 1 : Kido.opacity-disabled;
+        border-radius: root.height / 2;
+        background: Kido.white-08;
+        border-width: 1px;
+        border-color: Kido.white-14;
+
+        Rectangle {
+            border-radius: parent.border-radius;
+            background: @linear-gradient(90deg, Kido.accent-line 0%, Kido.accent-label 100%);
+            opacity: root.checked ? 1 : 0;
+            animate opacity { duration: Kido.motion-switch; }
+        }
+
+        Rectangle {
+            width: Kido.switch-knob;
+            height: Kido.switch-knob;
+            y: (parent.height - self.height) / 2;
+            x: root.checked ? parent.width - self.width - Kido.switch-inset : Kido.switch-inset;
+            border-radius: self.width / 2;
+            background: root.checked ? Kido.text : Kido.text-muted;
+            drop-shadow-blur: root.checked ? 8px : 0px;
+            drop-shadow-color: Kido.white-50;
+            animate x { duration: Kido.motion-switch; }
+        }
+    }
+
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.flip();
+        }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        focus-on-click: false;
+        // A control reached with keys or a controller scrolls into view.
+        changed has-focus => {
+            if self.has-focus {
+                root.ensure-visible(ScrollBehavior.instant);
+            }
+        }
+        key-pressed(event) => {
+            if event.text == " " || event.text == "\n" {
+                root.flip();
+                return accept;
+            }
+            reject
+        }
+    }
+}
+
+component Caret inherits Rectangle {
+    in property <string> data;
+    in property <bool> enabled;
+    in property <bool> lit;
+    callback clicked();
+    // Held down, the caret repeats after about half a second.
+    property <int> ticks;
+    width: 30px;
+    height: 30px;
+    border-radius: self.height / 2;
+    background: touch.pressed && root.enabled ? Kido.press : transparent;
+
+    Icon {
+        width: Kido.caret-size;
+        height: Kido.caret-size;
+        data: root.data;
+        color: root.lit ? Kido.accent-line : Kido.text-secondary;
+        opacity: root.enabled ? 1 : Kido.opacity-disabled;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.ticks = 0;
+            }
+        }
+        clicked => {
+            // The repeat has stepped already.
+            if root.ticks <= 6 {
+                root.clicked();
+            }
+        }
+    }
+
+    Timer {
+        interval: 80ms;
+        running: touch.pressed && root.enabled;
+        triggered => {
+            root.ticks += 1;
+            if root.ticks > 6 {
+                root.clicked();
+            }
+        }
+    }
+}
+
+// A number in whole seconds or counts, stepped with the carets of a Kidō
+// choice card (held down they repeat), or with Left and Right while
+// focused; Page Up and Page Down step by 10.
+export component Stepper inherits Rectangle {
+    in-out property <int> value;
+    in property <int> minimum;
+    in property <int> maximum;
+    in property <bool> enabled: true;
+    in property <string> unit;
+    in property <string> label;
+    callback edited(int);
+    forward-focus: focus;
+
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    accessible-role: spinbox;
+    accessible-label: root.label;
+    accessible-value: root.value;
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: root.maximum;
+    accessible-value-step: 1;
+    accessible-enabled: root.enabled;
+    accessible-action-increment => {
+        root.step(1);
+    }
+    accessible-action-decrement => {
+        root.step(-1);
+    }
+
+    function step(by: int) {
+        if root.enabled {
+            let next = clamp(root.value + by, root.minimum, root.maximum);
+            if next != root.value {
+                root.value = next;
+                root.edited(next);
+            }
+        }
+    }
+
+    border-radius: 15px;
+
+    if focus.has-focus && root.enabled: RingSoft {
+        radius: 15px;
+        ringed-width: root.width;
+        ringed-height: root.height;
+    }
+
+    HorizontalLayout {
+        spacing: 4px;
+        Caret {
+            data: Icons.caret-left;
+            enabled: root.enabled && root.value > root.minimum;
+            lit: focus.has-focus && root.enabled;
+            clicked => {
+                root.step(-1);
+            }
+        }
+
+        Text {
+            min-width: 52px;
+            text: root.unit == "" ? root.value : "\{root.value} \{root.unit}";
+            color: Kido.text;
+            font-size: Kido.button-size;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Caret {
+            data: Icons.caret-right;
+            enabled: root.enabled && root.value < root.maximum;
+            lit: focus.has-focus && root.enabled;
+            clicked => {
+                root.step(1);
+            }
+        }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        focus-on-click: false;
+        // A control reached with keys or a controller scrolls into view.
+        changed has-focus => {
+            if self.has-focus {
+                root.ensure-visible(ScrollBehavior.instant);
+            }
+        }
+        key-pressed(event) => {
+            // Up and Down move the focus (app.slint), as on a controller.
+            if event.text == Key.LeftArrow {
+                root.step(-1);
+                return accept;
+            }
+            if event.text == Key.RightArrow {
+                root.step(1);
+                return accept;
+            }
+            if event.text == Key.PageDown {
+                root.step(-10);
+                return accept;
+            }
+            if event.text == Key.PageUp {
+                root.step(10);
+                return accept;
+            }
+            reject
+        }
+    }
+}
+
+// A small uppercase section label in accent-label (Kidō's kicker).
+export component Kicker inherits Text {
+    color: Kido.accent-label;
+    font-size: Kido.kicker-size;
+    font-weight: 600;
+    letter-spacing: 1.8px;
+    accessible-role: text;
+}
+
+// One page of the sidebar. Kidō marks the chosen page with its text and
+// a 3 x 40 accent line (here upright, at the left edge), the others are
+// `text-muted`; no fill and no edge, as a ring means focus only.
+export component RailItem inherits Rectangle {
+    in property <string> text;
+    in property <bool> current;
+    // A small dot after the label, for news on that page.
+    in property <bool> marked;
+    in property <string> mark-label;
+    callback picked();
+    // -1 or 1 from the arrow keys while focused.
+    callback step(int);
+    forward-focus: focus;
+    out property <bool> has-focus: focus.has-focus;
+
+    height: 40px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: 12px;
+    background: touch.pressed ? Kido.press : touch.has-hover || root.current ? Kido.white-05 : transparent;
+    accessible-role: tab;
+    accessible-label: root.text;
+    accessible-description: root.marked ? root.mark-label : "";
+    accessible-item-selected: root.current;
+    accessible-action-default => {
+        root.picked();
+    }
+
+    if focus.has-focus: RingSoft {
+        radius: 12px;
+        ringed-width: root.width;
+        ringed-height: root.height;
+    }
+
+    // The current mark: 3 wide, 28 high (40 x 0.7), at the left edge.
+    Rectangle {
+        x: 0;
+        width: 3px;
+        height: 28px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 1.5px;
+        background: Kido.accent-line;
+        opacity: root.current ? 1 : 0;
+        animate opacity { duration: Kido.motion-focus; }
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 12px;
+        spacing: 8px;
+        Text {
+            text: root.text;
+            color: root.current ? Kido.text : Kido.text-muted;
+            font-size: Kido.segment-size;
+            font-weight: 500;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+
+        if root.marked: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Kido.accent-label;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.picked();
+        }
+    }
+
+    // Only the current page's item is in the Tab order, so that Tab goes
+    // from it to the page; Up and Down go through the items.
+    focus := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: root.current;
+        key-pressed(event) => {
+            if event.text == " " || event.text == "\n" {
+                root.picked();
+                return accept;
+            }
+            if event.text == Key.UpArrow {
+                root.step(-1);
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                root.step(1);
+                return accept;
+            }
+            reject
+        }
+    }
+}

@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/sudovda", "crates/urakata", "crates/urakata-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+repository = "https://github.com/Tokahiro/urakata"
+rust-version = "1.85"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows = "0.62"
+windows-registry = "0.6"
