@@ -205,11 +205,33 @@ pub fn update_text(release: Option<&Release>) -> String {
     match release {
         None => format!("urakata {} is up to date.", update::CURRENT),
         Some(r) => format!(
-            "urakata {} is available (this is {}). Press \"Release page\" to get the setup.",
+            "urakata {} is available (this is {}). Install it below.",
             r.version,
             update::CURRENT
         ),
     }
+}
+
+/// The notice after the installer started. The installer closes this
+/// window; it opens it again unless the window runs in Big Picture.
+pub fn installing_text(version: &str, reopens: bool) -> String {
+    if reopens {
+        format!(
+            "Installing urakata {version}. This window closes and opens again when the update is done."
+        )
+    } else {
+        format!(
+            "Installing urakata {version}. This window closes; open it again when the update is done."
+        )
+    }
+}
+
+/// The notice when the update did not start.
+pub fn install_error(error: &str) -> String {
+    format!(
+        "The update did not start: {}.",
+        error.trim_end().trim_end_matches('.')
+    )
 }
 
 /// The window's own size in logical pixels (`ui/app.slint`).
@@ -441,5 +463,11 @@ mod tests {
             sha256_url: String::new(),
         };
         assert!(update_text(Some(&r)).starts_with("urakata 9.0.0 is available"));
+        assert!(installing_text("9.0.0", true).contains("opens again"));
+        assert!(!installing_text("9.0.0", false).contains("opens again"));
+        assert_eq!(
+            install_error("a SudoVDA display is active (a stream runs); update after the stream"),
+            "The update did not start: a SudoVDA display is active (a stream runs); update after the stream."
+        );
     }
 }

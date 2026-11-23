@@ -69,6 +69,8 @@ export component AppWindow inherits Window {
 
     // About
     in property <string> version;
+    // The newer release that the last check found; "" for none.
+    in property <string> update-version;
 
     // The page shown: an index into page-names. The sidebar items (t0..t4)
     // and the `if root.page == n` blocks below follow this order.
@@ -96,6 +98,7 @@ export component AppWindow inherits Window {
     callback open-folder();
     callback repair-driver();
     callback check-update();
+    callback install-update();
     callback open-release-page();
     // Move the keyboard focus to the next (1) or previous (-1) control, as
     // Tab and Shift+Tab do. Rust sends the key; Slint has no call for it.
@@ -644,6 +647,26 @@ export component AppWindow inherits Window {
                                         root.notice = "";
                                         root.notice-at = "about";
                                         root.open-release-page();
+                                    }
+                                }
+                            }
+
+                            // Its own card, so that the focus on "Look for updates"
+                            // stays put when a check finds a release, and a second
+                            // press checks again instead of installing.
+                            if root.update-version != "": Card {
+                                title: "urakata " + root.update-version + " is available";
+                                notice: root.notice-at == "install" ? root.notice : "";
+                                notice-error: root.notice-error;
+                                value: "Install downloads the setup from GitHub, checks its SHA-256 and runs it. This window closes during the update.";
+                                KButton {
+                                    text: "Install";
+                                    primary: true;
+                                    enabled: !busy;
+                                    clicked => {
+                                        root.notice = "";
+                                        root.notice-at = "install";
+                                        root.install-update();
                                     }
                                 }
                             }

@@ -3,6 +3,12 @@
 The release workflow takes the notes of a release from the section with
 its version. The heading line of each section is exactly `## <version>`.
 
+## 0.1.3
+
+- The About page of the settings window can now install an update: after
+  **Look for updates**, press **Install**. The window closes during the
+  update and opens again when it is done.
+
 ## 0.1.2
 
 - New option `urakata --version` (short `-V`) prints the version.

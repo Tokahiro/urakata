@@ -12,7 +12,8 @@ use windows::Win32::Networking::WinHttp::{
 use windows::core::PCWSTR;
 
 use super::{
-    CURRENT, LATEST_URL, Release, final_host_allowed, newer_release, parse_sha256_file, split_url,
+    CURRENT, LATEST_URL, OPEN_APP_ARG, Release, final_host_allowed, newer_release,
+    parse_sha256_file, split_url,
 };
 
 /// Largest download accepted (the installer is about 10 MB).
@@ -37,12 +38,14 @@ pub fn check() -> Result<Option<Release>, String> {
 /// Downloads the installer, checks its hash and starts it silently. The
 /// installer stops the watcher and the settings window, replaces the
 /// files and starts the watcher again, so this process must end soon.
+/// With `open_app`, the installer opens the settings window on its About
+/// page when it is done (older installers ignore this).
 /// Refuses while a stream runs, because the watcher would stop during it.
-pub fn install(release: &Release) -> Result<String, String> {
+pub fn install(release: &Release, open_app: bool) -> Result<String, String> {
     // An elevated installer would start the watcher elevated, and a later
     // normal update could not stop it.
     if crate::driver::is_elevated() {
-        return Err("run `urakata update` without admin rights".into());
+        return Err("the update must run without admin rights".into());
     }
     if !crate::status::sudovda_monitor_ids()?.is_empty() {
         return Err("a SudoVDA display is active (a stream runs); update after the stream".into());
@@ -62,9 +65,12 @@ pub fn install(release: &Release) -> Result<String, String> {
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let path = dir.join(&release.setup_name);
     std::fs::write(&path, &setup).map_err(|e| format!("{}: {e}", path.display()))?;
-    std::process::Command::new(&path)
-        .args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
-        .spawn()
+    let mut cmd = std::process::Command::new(&path);
+    cmd.args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]);
+    if open_app {
+        cmd.arg(OPEN_APP_ARG);
+    }
+    cmd.spawn()
         .map_err(|e| format!("cannot start {}: {e}", path.display()))?;
     Ok(format!(
         "Started the installer for urakata {} ({}). It runs without a window.",

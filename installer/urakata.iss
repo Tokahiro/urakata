@@ -218,6 +218,10 @@ begin
     else
       Exec(ExpandConstant('{app}\urakata.exe'), 'watch --uninstall', '', SW_HIDE,
         ewWaitUntilTerminated, Code);
+    { /OPENAPP=1: the update was started from the settings window, which
+      StopWatcher closed. Open it again on its About page. }
+    if (ExpandConstant('{param:openapp|0}') = '1') and AppWindowInstalled then
+      Exec(ExpandConstant('{app}\urakata-app.exe'), '--about', '', SW_SHOW, ewNoWait, Code);
   end;
 end;
 

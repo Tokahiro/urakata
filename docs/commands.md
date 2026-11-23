@@ -86,8 +86,8 @@ urakata update [--check]
 Looks for a newer release on GitHub. When there is one, it downloads the
 setup, checks its SHA-256 and runs it without questions. Your settings
 and the driver stay as they are. The logon start follows your last setup
-choice (see [Update](install.md#update)). Not yet tested with a published
-release.
+choice (see [Update](install.md#update)). The **Install** button on the
+**About** page of the settings window does the same.
 
 - `--check`: only says whether a newer release exists.
 

@@ -19,6 +19,13 @@ pub const LATEST_URL: &str = "https://api.github.com/repos/Tokahiro/urakata/rele
 /// Web page of the latest release, for people.
 pub const RELEASE_PAGE: &str = "https://github.com/Tokahiro/urakata/releases/latest";
 
+/// Installer argument: open the settings window on its About page when
+/// the update is done (`installer/urakata.iss`).
+pub const OPEN_APP_ARG: &str = "/OPENAPP=1";
+
+/// Settings window argument: open on the About page.
+pub const ABOUT_ARG: &str = "--about";
+
 /// Hosts that a request may start at.
 pub const ALLOWED_HOSTS: [&str; 2] = ["api.github.com", "github.com"];
 

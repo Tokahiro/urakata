@@ -67,12 +67,13 @@ click **Run anyway**.
 ## Update
 
 - In the settings window, open **About** and press **Look for updates**.
-  If a newer release exists, press **Release page** and run the new
-  setup.
+  If a newer release exists, press **Install**. The window downloads the
+  new setup from GitHub, checks its SHA-256 and runs it without
+  questions. The window closes during the update and opens again when it
+  is done.
 - Or run `urakata update` (see [Command line](commands.md#update)). It
-  downloads the new setup from GitHub, checks its SHA-256 and runs it
-  without questions. This path was not yet tested with a published
-  release. If it fails, download and run the setup by hand.
+  does the same from a terminal.
+- Or press **Release page**, download the setup and run it by hand.
 
 An update keeps your settings and the driver. Do not update while a
 stream runs. The logon start goes back to your choice in the last setup

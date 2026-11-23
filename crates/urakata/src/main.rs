@@ -496,7 +496,7 @@ fn update(check_only: bool) -> Result<String, String> {
             r.version,
             update::CURRENT
         )),
-        Some(r) => update::install(&r),
+        Some(r) => update::install(&r, false),
     }
 }
 

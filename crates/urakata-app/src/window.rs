@@ -5,6 +5,7 @@ use std::cell::Cell;
 use std::path::Path;
 use std::process::{Command, ExitCode};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use slint::platform::{Key, WindowEvent};
@@ -105,6 +106,11 @@ pub fn run() -> ExitCode {
     ui.set_max_guard_reapply(MAX_GUARD_REAPPLY as i32);
     ui.set_version(update::CURRENT.into());
     ui.set_driver_line("Reading…".into());
+    // The installer opens the window there after an update. A settings
+    // error below moves it to the Settings page.
+    if std::env::args().skip(1).any(|a| a == update::ABOUT_ARG) {
+        ui.set_page(4);
+    }
     load_settings(&ui, &saved);
     wire(&ui, &saved);
     if big_picture {
@@ -281,9 +287,50 @@ fn wire(ui: &AppWindow, saved: &Saved) {
             action(&weak, move || repair_driver(owner))
         }
     });
+    // The newer release that the last check found.
+    let found: Arc<Mutex<Option<update::Release>>> = Arc::default();
     ui.on_check_update({
         let weak = ui.as_weak();
-        move || action(&weak, || Ok(view::update_text(update::check()?.as_ref())))
+        let found = found.clone();
+        move || {
+            let to_ui = weak.clone();
+            let found = found.clone();
+            action(&weak, move || {
+                // A failed check hides the Install card too: the release
+                // found before may be gone.
+                let result = update::check();
+                let release = result.as_ref().ok().cloned().flatten();
+                let version = release
+                    .as_ref()
+                    .map(|r| r.version.clone())
+                    .unwrap_or_default();
+                *found.lock().unwrap_or_else(|e| e.into_inner()) = release;
+                let _ =
+                    to_ui.upgrade_in_event_loop(move |ui| ui.set_update_version(version.into()));
+                Ok(view::update_text(result?.as_ref()))
+            })
+        }
+    });
+    ui.on_install_update({
+        let weak = ui.as_weak();
+        move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let Some(release) = found.lock().unwrap_or_else(|e| e.into_inner()).clone() else {
+                return;
+            };
+            // Opened again from the desktop, a Big Picture window would
+            // not be fullscreen; Steam starts that one again.
+            let reopens = !ui.global::<Kido>().get_big_picture();
+            notice(
+                &ui,
+                &format!("Downloading urakata {}…", release.version),
+                false,
+            );
+            action(&weak, move || match update::install(&release, reopens) {
+                Ok(_) => Ok(view::installing_text(&release.version, reopens)),
+                Err(e) => Err(view::install_error(&e)),
+            })
+        }
     });
     ui.on_open_release_page({
         let weak = ui.as_weak();
